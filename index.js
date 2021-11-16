@@ -1,62 +1,4 @@
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-class Sound {
-  constructor(context) {
-    this.context = context;
-  }
-
-  init() {
-    this.oscillator = this.context.createOscillator();
-    this.gainNode = this.context.createGain();
-    this.oscillator.connect(this.gainNode);
-    this.gainNode.connect(this.context.destination);
-    // this.oscillator/
-    //   .frequency
-    //   .setValueAtTime(466.16, this.context.currentTime);
-    this.oscillator.type = 'sine';
-    // this.oscillator.type = 'triangle';
-  }
-
-  // play(note, prevDuration) {
-  //   this.init();
-  //
-  //   this.oscillator.frequency.value = note.frequency;
-  //   console.log(note.duration, 'duration');
-  //   const step = note.duration;
-  //   this.gainNode.gain.linearRampToValueAtTime(1, this.context.currentTime + prevDuration);
-  //   console.log(step, 'step');
-  //   this.gainNode.gain.linearRampToValueAtTime(1, this.context.currentTime + 0.01);
-  //   this.oscillator.start(this.context.currentTime + prevDuration);
-  //   this.gainNode.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + step + prevDuration);
-  //   this.oscillator.stop(this.context.currentTime + step + prevDuration);
-  //   console.log(this.context.currentTime, 'this.context.currentTime');
-  // }
-  play(note, prevDuration) {
-    // create and connect oscillator and gain nodes
-    this.time = this.context.currentTime;
-    this.oscillator = this.context.createOscillator();
-    this.gainNode = this.context.createGain();
-
-    this.oscillator.connect(this.gainNode);
-    this.gainNode.connect(this.context.destination);
-
-    // setup sound
-    this.oscillator.type = 'sine';
-    this.oscillator.frequency.value = note.frequency;
-    this.gainNode.gain.setValueAtTime(0.3, this.time + prevDuration);
-
-    // play sound
-    this.oscillator.start(this.time + prevDuration);
-    this.gainNode.gain.exponentialRampToValueAtTime(0.1, this.time + prevDuration + note.duration);
-    this.oscillator.stop(this.time + prevDuration + note.duration);
-  }
-
-
-
-  stop() {
-    this.gainNode.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 1);
-    this.oscillator.stop(this.context.currentTime + 1);
-  }
-}
 const notesMap = {
   'C1': 32.703,
   'D1': 36.708,
@@ -155,14 +97,44 @@ const notesMap = {
   'A#7': 3729.3,
   'A#8': 7458.6,
 };
-// const sound = new Sound(audioContext);
+
+class Sound {
+  constructor(context) {
+    this.context = context;
+  }
+
+  init() {
+    this.oscillator = this.context.createOscillator();
+    this.gainNode = this.context.createGain();
+    this.oscillator.connect(this.gainNode);
+    this.gainNode.connect(this.context.destination);
+  }
+
+  play(note, prevDuration) {
+    // create and connect oscillator and gain nodes
+    this.init();
+    this.time = this.context.currentTime;
+
+    // setup sound
+    this.oscillator.type = 'sine';
+    this.oscillator.frequency.value = note.frequency;
+    this.gainNode.gain.setValueAtTime(0.3, this.time + prevDuration);
+
+    // play sound
+    this.oscillator.start(this.time + prevDuration);
+    this.gainNode.gain.exponentialRampToValueAtTime(0.1, this.time + prevDuration + note.duration);
+    this.oscillator.stop(this.time + prevDuration + note.duration);
+  }
+
+  // stop() {
+  //   this.gainNode.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 1);
+  //   this.oscillator.stop(this.context.currentTime + 1);
+  // }
+}
+
 const playButton = document.getElementById('play-button');
 const textarea = document.getElementById('textarea');
-const bmpButon = document.getElementById('bmp');
-// const oscillator = audioContext.createOscillator();
-// oscillator.connect(audioContext.destination);
-
-// sound.init();
+const bpmInput = document.getElementById('bpm');
 playButton.addEventListener('click', play);
 
 function play() {
@@ -170,25 +142,20 @@ function play() {
   //   console.log('Playback resumed successfully');
 
   // if (playButton.textContent === 'Play') {
-    const notes = parseNoteCode();
+  const noteCode = textarea.value;
 
-    // notes.forEach(({frequency, duration}) => {
-      let sound = new Sound(audioContext);
-    //   sound.play({frequency, duration});
-    //   sound.stop();
-    // });
+  if (!noteCode) {
+    return;
+  }
 
-    const time = notes.reduce((acc, {duration, frequency}) => {
-      console.log(acc);
-      const time = acc + duration;
+  const notes = parseNoteCode(noteCode);
+  const sound = new Sound(audioContext);
 
-      sound.play({frequency, duration}, time);
-      //   sound.stop();
+  notes.reduce((delay, {duration, frequency}) => {
+    sound.play({frequency, duration}, delay);
 
-      return time;
-    }, 0);
-
-    console.log(time, 'time');
+    return round(delay + duration);
+  }, 0);
     // sound.stop();
 
     // playButton.textContent = 'Pause';
@@ -200,48 +167,40 @@ function play() {
 
 }
 
-function parseNoteCode() {
-  const noteCode = textarea.value;
-  const bmp = bmpButon.value || 100;
-
-  if (!noteCode) {
-    return;
-  }
-
+function parseNoteCode(noteCode) {
+  const bpm = bpmInput.value || 100;
   const noteData = noteCode.replace(/\n/g, ' ',).split(' ');
   const notes = [];
 
   noteData.forEach(item => {
     const itemArr = item.split('/');
-    const note = itemArr[0]; // note
+    const frequency = itemArr[0] ? notesMap[itemArr[0]] : null;
 
-    console.log(itemArr, 'itemArr');
+    if (frequency) {
+      let multiplier = 1;
 
-    if (note) {
-      const duration = itemArr[1].includes('.') ? filterDots(itemArr[1]) : 1/+itemArr[1]; // duration
+      if (itemArr[1].includes('.')) {
+        multiplier = 1.5;
+        itemArr[1] = itemArr[1].replace('.', '');
+      }
 
-      const noteData = {
-        frequency: notesMap[note],
-        duration: this.noteDurationToMs(bmp, duration) / 1000,
+      const duration = multiplier / +itemArr[1];
+      const note = {
+        frequency,
+        duration: this.noteDurationToMs(bpm, duration),
       };
 
-      notes.push(noteData);
+      notes.push(note);
     }
   });
 
   return notes;
 }
 
-function filterDots(value) {
-  value = value.replace('32.', '0.046875') // 1/32 + 1/64
-    .replace('16.', ' 0.09375') // 1/16 + 1/32
-    .replace('8.', '0.1875') // 1/8 + 1/16
-    .replace('4.', '0.375') // 1/4 + 1/8
-    .replace('2.', '0.75'); // 1/2 + 1/4
-
-  return +value;
+function noteDurationToMs (bpm, duration) {
+  return 60 * 4 * round(duration) / bpm;
 }
 
-function noteDurationToMs (bpm, dur) {
-  return 60000 * 4 * dur / bpm;
+function round(value) {
+  return Math.round((value) * 100) / 100;
 }
