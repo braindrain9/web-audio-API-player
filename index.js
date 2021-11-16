@@ -1,5 +1,5 @@
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-const notesMap = {
+const NOTES_MAP = {
   'C1': 32.703,
   'D1': 36.708,
   'E1': 41.203,
@@ -116,7 +116,7 @@ class Sound {
     this.time = this.context.currentTime;
 
     // setup sound
-    this.oscillator.type = 'sine';
+    this.oscillator.type = osctypeInput.value || 'sine';
     this.oscillator.frequency.value = note.frequency;
     this.gainNode.gain.setValueAtTime(0.3, this.time + prevDuration);
 
@@ -134,10 +134,12 @@ class Sound {
 
 const playButton = document.getElementById('play-button');
 const textarea = document.getElementById('textarea');
-const bpmInput = document.getElementById('bpm');
+const tempoInput = document.getElementById('tempo');
+const osctypeInput = document.getElementById('osctype');
 playButton.addEventListener('click', play);
 
-function play() {
+function play(event) {
+  event.preventDefault();
   // audioContext.resume().then(() => {
   //   console.log('Playback resumed successfully');
 
@@ -168,13 +170,13 @@ function play() {
 }
 
 function parseNoteCode(noteCode) {
-  const bpm = bpmInput.value || 100;
+  const tempo = tempoInput.value || 100;
   const noteData = noteCode.replace(/\n/g, ' ',).split(' ');
   const notes = [];
 
   noteData.forEach(item => {
     const itemArr = item.split('/');
-    const frequency = itemArr[0] ? notesMap[itemArr[0]] : null;
+    const frequency = itemArr[0] ? NOTES_MAP[itemArr[0]] : null;
 
     if (frequency) {
       let multiplier = 1;
@@ -187,7 +189,7 @@ function parseNoteCode(noteCode) {
       const duration = multiplier / +itemArr[1];
       const note = {
         frequency,
-        duration: this.noteDurationToMs(bpm, duration),
+        duration: this.noteDurationToMs(tempo, duration),
       };
 
       notes.push(note);
@@ -197,8 +199,8 @@ function parseNoteCode(noteCode) {
   return notes;
 }
 
-function noteDurationToMs (bpm, duration) {
-  return 60 * 4 * round(duration) / bpm;
+function noteDurationToMs (tempo, duration) {
+  return 60 * 4 * round(duration) / tempo;
 }
 
 function round(value) {
