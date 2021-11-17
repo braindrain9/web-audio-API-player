@@ -1,4 +1,3 @@
-const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 const NOTES_MAP = {
   'C1': 32.703,
   'D1': 36.708,
@@ -99,21 +98,21 @@ const NOTES_MAP = {
 };
 
 class Sound {
-  constructor(context) {
-    this.context = context;
+  constructor() {
+    this.counter = 0;
   }
 
-  init() {
-    this.oscillator = this.context.createOscillator();
-    this.gainNode = this.context.createGain();
+  init = () => {
+    this.oscillator = audioContext.createOscillator();
+    this.gainNode = audioContext.createGain();
     this.oscillator.connect(this.gainNode);
-    this.gainNode.connect(this.context.destination);
-  }
+    this.gainNode.connect(audioContext.destination);
+  };
 
-  play(note, prevDuration) {
+  play(note, prevDuration, notesLength) {
     // create and connect oscillator and gain nodes
     this.init();
-    this.time = this.context.currentTime;
+    this.time = audioContext.currentTime;
 
     // setup sound
     this.oscillator.type = osctypeInput.value || 'sine';
@@ -124,26 +123,67 @@ class Sound {
     this.oscillator.start(this.time + prevDuration);
     this.gainNode.gain.exponentialRampToValueAtTime(0.1, this.time + prevDuration + note.duration);
     this.oscillator.stop(this.time + prevDuration + note.duration);
-  }
 
-  // stop() {
-  //   this.gainNode.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 1);
-  //   this.oscillator.stop(this.context.currentTime + 1);
-  // }
+    this.oscillator.onended = () => {
+      this.counter += 1;
+
+      console.log(notesLength, this.counter);
+      if (notesLength === this.counter) {
+        onComplete();
+      }
+    }
+  }
 }
 
 const playButton = document.getElementById('play-button');
+const stopButton = document.getElementById('stop-button');
 const textarea = document.getElementById('textarea');
 const tempoInput = document.getElementById('tempo');
 const osctypeInput = document.getElementById('osctype');
 playButton.addEventListener('click', play);
+stopButton.addEventListener('click', stop);
+
+let audioContext;
+let isPaused = false;
+
+createAudioContext();
 
 function play(event) {
   event.preventDefault();
-  // audioContext.resume().then(() => {
-  //   console.log('Playback resumed successfully');
 
-  // if (playButton.textContent === 'Play') {
+  stopButton.disabled = false;
+  textarea.disabled = true;
+  tempoInput.disabled = true;
+  osctypeInput.disabled = true;
+
+  if (playButton.textContent === 'Play') {
+    playButton.textContent = 'Pause';
+
+    if (audioContext.state === 'closed') {
+      createAudioContext();
+    }
+
+    console.log(isPaused, 'isPaused');
+
+    audioContext.resume().then(() => {
+      if (!isPaused) {
+        playFromBeginning();
+      }
+    });
+  } else {
+    onPause();
+  }
+}
+
+function stop(event) {
+  event.preventDefault();
+
+  onComplete();
+}
+
+function playFromBeginning() {
+  console.log('playFromBeginning');
+
   const noteCode = textarea.value;
 
   if (!noteCode) {
@@ -151,22 +191,38 @@ function play(event) {
   }
 
   const notes = parseNoteCode(noteCode);
-  const sound = new Sound(audioContext);
+  const sound = new Sound();
 
   notes.reduce((delay, {duration, frequency}) => {
-    sound.play({frequency, duration}, delay);
+    sound.play({frequency, duration}, delay, notes.length);
 
     return round(delay + duration);
   }, 0);
-    // sound.stop();
+}
 
-    // playButton.textContent = 'Pause';
-  // } else {
-  //   sound.sto/p();
-  //   playButton.textContent = 'Play';
-  // }
-  // });
+function onPause() {
+  playButton.textContent = 'Play';
+  isPaused = true;
 
+  if (audioContext?.state !== 'closed') {
+    audioContext.suspend();
+  }
+}
+
+function onComplete() {
+  playButton.textContent = 'Play';
+  isPaused = false;
+  textarea.disabled = false;
+  tempoInput.disabled = false;
+  osctypeInput.disabled = false;
+
+  if (audioContext?.state !== 'closed') {
+    audioContext.close();
+  }
+}
+
+function createAudioContext() {
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
 }
 
 function parseNoteCode(noteCode) {
@@ -174,7 +230,7 @@ function parseNoteCode(noteCode) {
   const noteData = noteCode.replace(/\n/g, ' ',).split(' ');
   const notes = [];
 
-  noteData.forEach(item => {
+  noteData.forEach((item) => {
     const itemArr = item.split('/');
     const frequency = itemArr[0] ? NOTES_MAP[itemArr[0]] : null;
 
