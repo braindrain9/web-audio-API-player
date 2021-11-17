@@ -138,6 +138,7 @@ class Sound {
 const playButton = document.getElementById('play-button');
 const stopButton = document.getElementById('stop-button');
 const textarea = document.getElementById('textarea');
+const textarea2 = document.getElementById('textarea2');
 const tempoInput = document.getElementById('tempo');
 const osctypeInput = document.getElementById('osctype');
 playButton.addEventListener('click', play);
@@ -145,6 +146,7 @@ stopButton.addEventListener('click', stop);
 
 let audioContext;
 let isPaused = false;
+let has2Outputs;
 
 createAudioContext();
 
@@ -153,6 +155,7 @@ function play(event) {
 
   stopButton.disabled = false;
   textarea.disabled = true;
+  textarea2.disabled = true;
   tempoInput.disabled = true;
   osctypeInput.disabled = true;
 
@@ -178,6 +181,7 @@ function play(event) {
 function stop(event) {
   event.preventDefault();
 
+  has2Outputs = false;
   onComplete();
 }
 
@@ -185,19 +189,16 @@ function playFromBeginning() {
   console.log('playFromBeginning');
 
   const noteCode = textarea.value;
+  const noteCode2 = textarea2.value;
 
-  if (!noteCode) {
+  if (!noteCode && !noteCode2) {
     return;
   }
 
-  const notes = parseNoteCode(noteCode);
-  const sound = new Sound();
+  has2Outputs = noteCode && noteCode;
 
-  notes.reduce((delay, {duration, frequency}) => {
-    sound.play({frequency, duration}, delay, notes.length);
-
-    return round(delay + duration);
-  }, 0);
+  onPlay(noteCode);
+  onPlay(noteCode2);
 }
 
 function onPause() {
@@ -209,16 +210,36 @@ function onPause() {
   }
 }
 
-function onComplete() {
-  playButton.textContent = 'Play';
-  isPaused = false;
-  textarea.disabled = false;
-  tempoInput.disabled = false;
-  osctypeInput.disabled = false;
+function onPlay(noteCode) {
+  const notes = parseNoteCode(noteCode);
 
-  if (audioContext?.state !== 'closed') {
-    audioContext.close();
+  if (notes.length) {
+    const sound = new Sound();
+
+    notes.reduce((delay, {duration, frequency}) => {
+      sound.play({frequency, duration}, delay, notes.length);
+
+      return round(delay + duration);
+    }, 0);
   }
+}
+
+function onComplete() {
+  if (has2Outputs) {
+    has2Outputs = false;
+  } else {
+    playButton.textContent = 'Play';
+    isPaused = false;
+    textarea.disabled = false;
+    textarea2.disabled = false;
+    tempoInput.disabled = false;
+    osctypeInput.disabled = false;
+
+    if (audioContext?.state !== 'closed') {
+      audioContext.close();
+    }
+  }
+
 }
 
 function createAudioContext() {
@@ -226,6 +247,10 @@ function createAudioContext() {
 }
 
 function parseNoteCode(noteCode) {
+  if (!noteCode) {
+    return [];
+  }
+
   const tempo = tempoInput.value || 100;
   const noteData = noteCode.replace(/\n/g, ' ',).split(' ');
   const notes = [];
@@ -233,8 +258,9 @@ function parseNoteCode(noteCode) {
   noteData.forEach((item) => {
     const itemArr = item.split('/');
     const frequency = itemArr[0] ? NOTES_MAP[itemArr[0]] : null;
+    const isValidNote = frequency && itemArr[1];
 
-    if (frequency) {
+    if (isValidNote) {
       let multiplier = 1;
 
       if (itemArr[1].includes('.')) {
