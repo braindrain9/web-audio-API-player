@@ -98,11 +98,8 @@ const NOTES_MAP = {
 };
 
 class Sound {
-  constructor() {
-    this.counter = 0;
-  }
-
   init = () => {
+    this.counter = 0;
     this.oscillator = audioContext.createOscillator();
     this.gainNode = audioContext.createGain();
     this.oscillator.connect(this.gainNode);
@@ -127,7 +124,6 @@ class Sound {
     this.oscillator.onended = () => {
       this.counter += 1;
 
-      console.log(notesLength, this.counter);
       if (notesLength === this.counter) {
         onComplete();
       }
@@ -141,6 +137,7 @@ const textarea = document.getElementById('textarea');
 const textarea2 = document.getElementById('textarea2');
 const tempoInput = document.getElementById('tempo');
 const osctypeInput = document.getElementById('osctype');
+
 playButton.addEventListener('click', play);
 stopButton.addEventListener('click', stop);
 
@@ -166,8 +163,6 @@ function play(event) {
       createAudioContext();
     }
 
-    console.log(isPaused, 'isPaused');
-
     audioContext.resume().then(() => {
       if (!isPaused) {
         playFromBeginning();
@@ -186,8 +181,6 @@ function stop(event) {
 }
 
 function playFromBeginning() {
-  console.log('playFromBeginning');
-
   const noteCode = textarea.value;
   const noteCode2 = textarea2.value;
 
